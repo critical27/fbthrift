@@ -126,7 +126,7 @@ if(lib_only OR build_all)
     include(${THRIFT_COMPILER_INCLUDE}/thrift/ThriftLibrary.cmake)
   endif(lib_only)
 
-  find_package(python-six)
+  find_package(python-six PATHS $ENV{PYTHON_SIX_PATH})
   if("${thriftpy}" STREQUAL "AUTO")
     if(python-six_FOUND)
       message(STATUS
