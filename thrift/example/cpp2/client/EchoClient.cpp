@@ -17,20 +17,14 @@
 #include <folly/SocketAddress.h>
 #include <folly/init/Init.h>
 #include <folly/io/async/EventBase.h>
+#include <thrift/lib/cpp2/async/RocketClientChannel.h>
 #include <thrift/example/cpp2/server/EchoService.h>
 #include <thrift/example/if/gen-cpp2/Echo.h>
-#include <thrift/lib/cpp2/transport/core/testutil/ServerConfigsMock.h>
-#include <thrift/perf/cpp2/util/Util.h>
 
 DEFINE_string(host, "::1", "EchoServer host");
 DEFINE_int32(port, 7778, "EchoServer port");
-DEFINE_string(
-    transport,
-    "header",
-    "Transport to use: header, rsocket, http2, or inmemory");
 
 using example::chatroom::EchoAsyncClient;
-using example::chatroom::EchoHandler;
 
 int main(int argc, char* argv[]) {
   FLAGS_logtostderr = true;
@@ -39,23 +33,10 @@ int main(int argc, char* argv[]) {
   // create eventbase first so no dangling stack refs on 'client' dealloc
   folly::EventBase evb;
 
-  // Create a thrift client
-  auto addr = folly::SocketAddress(FLAGS_host, FLAGS_port);
-  auto ct = std::make_shared<ConnectionThread<EchoAsyncClient>>();
-  auto client = ct->newSyncClient(addr, FLAGS_transport);
-
-  // For header transport
-  if (FLAGS_transport == "header") {
-    client = newHeaderClient<EchoAsyncClient>(&evb, addr);
-  }
-
-  // For inmemory transport
-  auto handler = std::make_shared<EchoHandler>();
-  ServerConfigsMock serverConfigs;
-  if (FLAGS_transport == "inmemory") {
-    client = newInMemoryClient<EchoAsyncClient, EchoHandler>(
-        &evb, handler, serverConfigs);
-  }
+  // Create a thrift client based on RocketClientChannel
+  auto socket = folly::AsyncSocket::UniquePtr(new folly::AsyncSocket(&evb, FLAGS_host, FLAGS_port));
+  auto channel = apache::thrift::RocketClientChannel::newChannel(std::move(socket));
+  auto client = std::make_unique<EchoAsyncClient>(std::move(channel));
 
   // Prepare thrift request
   std::string message = "Ping this back";
